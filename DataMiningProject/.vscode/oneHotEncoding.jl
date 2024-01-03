@@ -1,11 +1,13 @@
 using XLSX
 using DataFrames
+using Random
 
 
-xlsx_file_path = "cleaning_data3.xlsx"
-infoboxes = DataFrame(XLSX.readtable(xlsx_file_path, "Sheet1"))
+
+xlsx_file_path = "cleaning_data.xlsx"
+infoboxes = DataFrame(XLSX.readtable(xlsx_file_path, "Sheet1")...)
 """
-xlsx_file_path = "output3.xlsx"
+xlsx_file_path = "cleaning_data.xlsx"
 excelInf = XLSX.readtable(xlsx_file_path,"Sheet1"; header = true)
 infoboxes = DataFrame(excelInf...)
 """
@@ -93,9 +95,7 @@ for infobox in eachrow(infoboxes)
     formats = infobox.Format
     formats = split(formats,";;")
     pop!(formats)
-    union!(allFormatsSet,formats)
-
-     
+    union!(allFormatsSet,formats)      
 end
 
 
@@ -170,8 +170,210 @@ end
 
 
 
+global data = DataFrame(
+    AD =String[], 
+    Format=Vector{Int}[],
+    Tür=Vector{Int}[],
+    Senarist=Vector{Int}[], 
+    Yönetmen=Vector{Int}[], 
+    Başrol=Vector{Int}[],
+    Ülke=String[], 
+    Dili=String[], 
+    Sezonsayısı =Int[], 
+    Bölümsayısı=Int[], 
+    Yapımcı=Vector{Int}[], 
+    Gösterimsüresi=Int[], 
+    Yapımşirketi=Vector{Int}[],
+    Kanal=Vector{Int}[],
+    YayınBaslangıc=Int[], 
+    YayınBitis=Int[],
+    Durumu=String[],
+    #DiğerUlkelerGosterim=[],
+)
+
+temp = DataFrame(
+    AD =String[], 
+    Format=Vector{Int}[],
+    Tür=Vector{Int}[],
+    Senarist=Vector{Int}[], 
+    Yönetmen=Vector{Int}[], 
+    Başrol=Vector{Int}[],
+    Ülke=String[], 
+    Dili=String[], 
+    Sezonsayısı =Int[], 
+    Bölümsayısı=Int[], 
+    Yapımcı=Vector{Int}[], 
+    Gösterimsüresi=Int[], 
+    Yapımşirketi=Vector{Int}[],
+    Kanal=Vector{Int}[],
+    YayınBaslangıc=Int[], 
+    YayınBitis=Int[],
+    Durumu=String[],
+    #DiğerUlkelerGosterim=[],
+)
+
+for infobox in eachrow(infoboxes)
+    global data
+    allowmissing!(temp)
+    push!(temp, fill(missing, ncol(temp)))
+
+    try
+        temp[1, Symbol("AD")] = string.(infobox.AD)
+        temp[1, Symbol("Format")] = infobox.Format
+        temp[1, Symbol("Tür")] = infobox.Tür
+        temp[1, Symbol("Senarist")] = infobox.Senarist
+        temp[1, Symbol("Yönetmen")] = infobox.Yönetmen
+        temp[1, Symbol("Başrol")] = infobox.Başrol
+        temp[1, Symbol("Ülke")] = infobox.Ülke
+        temp[1, Symbol("Dili")] = infobox.Dili
+        temp[1, Symbol("Sezonsayısı")] = parse(Int, infobox.Sezonsayısı)
+        temp[1, Symbol("Bölümsayısı")] =parse(Int,  infobox.Bölümsayısı)
+        temp[1, Symbol("Yapımcı")] = infobox.Yapımcı
+        temp[1, Symbol("Gösterimsüresi")] = parse(Int,  infobox.Gösterimsüresi)
+        temp[1, Symbol("Yapımşirketi")] = infobox.Yapımşirketi
+        temp[1, Symbol("Kanal")] = infobox.Kanal
+        temp[1, Symbol("YayınBaslangıc")] = infobox.YayınBaslangıc
+        temp[1, Symbol("YayınBitis")] = infobox.YayınBaslangıc
+        temp[1, Symbol("YayınBitis")] = infobox.YayınBitis
+        temp[1, Symbol("Durumu")] = string.(infobox.Durumu)
+        
+    catch e
+            println("some error")
+            empty!(temp)
+            continue
+
+    end
 
 
+    data=  vcat(data, temp)
+    empty!(temp)
+end
+
+dropmissing!(data)
+
+
+
+features  = [:Format, :Tür, :Senarist, :Yönetmen, :Başrol, :Yapımcı, :Yapımşirketi, :Kanal, :YayınBaslangıc]
+target = :Durumu
+#subset_data = select(data, selected_columns)
+
+function create_training_data(data, train_fraction)
+    n_samples = Int(round(size(data, 1) * train_fraction))
+    
+    shuffled_data = shuffle(data)
+    training_data = shuffled_data[1:n_samples, :]
+    
+    return training_data
+end
+
+function create_training_data_without_test_data(full_data, test_data)
+    condition_to_keep(row) = !(row in eachrow(test_data))
+    training_data = filter(row -> condition_to_keep(row), full_data)
+    return training_data
+end
+
+function split_data(df, train_fraction)
+    n = nrow(df)
+    indices = randperm(n)
+    train_size = Int(round(train_fraction * n))
+    train_indices = indices[1:train_size]
+    test_indices = indices[train_size+1:end]
+    return df[train_indices, :], df[test_indices, :]
+end
+
+train_fraction = 0.1
+
+#test_datas = create_training_data(data, train_fraction)
+#train_datas = create_training_data_without_test_data(data, test_datas)
+test_datas,train_datas = split_data(data, train_fraction)
+
+#TEST_dATADA VE TRAİN DATADAN BÖLÜM SAYISI SEZON SAYISI YAYINBİTİŞ DURUMU
+select!(train_datas, Not([:"Bölümsayısı",:"YayınBitis",:"Durumu"]))
+select!(test_datas, Not([:"Bölümsayısı",:"YayınBitis",:"Durumu"]))
+
+#select!(test_datas, Not([:"Sezonsayısı"]))
+test_data_sezonsayısı = test_datas[:, "Sezonsayısı"]
+select!(test_datas, Not([:"Sezonsayısı"]))
+
+"""
+testData = eachrow(test_datas)[1]
+baslangıcTarihi = testData.YayınBaslangıc
+
+condition_to_keep(row) = row.YayınBaslangıc < baslangıcTarihi 
+filtered_trainData = filter(row -> condition_to_keep(row), train_datas)
+
+Xtrain_datas = filtered_trainData[!, :1 :end]
+Ytrain_datas = filtered_trainData[:,:Sezonsayısı]
+realSezonSayısı = testData.Sezonsayısı
+select!(Xtrain_datas, Not([:"Sezonsayısı"]))
+select!(testData, Not([:"Sezonsayısı"]))
+using DecisionTree
+model = DecisionTreeClassifier(max_depth=5)
+DecisionTree.fit!(model, Matrix(Xtrain_datas), Ytrain_datas)
+predictions = DecisionTree.predict(model, Matrix(DataFrame(testData))) #SEZON SAYISI TAHMİN EDİLDİ
+if predictions[1] == realSezonSayısı
+    print("başarılı ")
+    println(predictions)
+else
+    println("hatalı tahmin gerçek değer")
+    println(predictions)
+
+end
+
+
+"""
+
+
+predicted_Values = Int[]
+for i in 1:length(eachrow(test_datas))
+    testData=eachrow(test_datas)[i]
+
+    baslangıcTarihi = testData.YayınBaslangıc
+    condition_to_keep(row) = row.YayınBaslangıc < baslangıcTarihi 
+    filtered_trainData = filter(row -> condition_to_keep(row), train_datas)
+
+    Xtrain_datas = filtered_trainData[!, :1 :end]
+    Ytrain_datas = filtered_trainData[:,:Sezonsayısı]
+    realSezonSayısı = test_data_sezonsayısı[i]
+
+    select!(Xtrain_datas, Not([:"Sezonsayısı"]))
+    
+
+    using DecisionTree
+    model = DecisionTreeClassifier(max_depth=100)
+    DecisionTree.fit!(model, Matrix(Xtrain_datas), Ytrain_datas)
+    predictions = DecisionTree.predict(model, Matrix(DataFrame(testData))) #SEZON SAYISI TAHMİN EDİLDİ
+    print(testData.AD)
+    println(predictions)
+    print("gerçek data ")
+    println(realSezonSayısı)
+    push!(predicted_Values,predictions[1])
+    """
+    if predictions[1] == realSezonSayısı
+        print("başarılı ")
+        println(predictions)
+    else
+        println("hatalı tahmin gerçek değer")
+        println(predictions)
+
+    end"""
+end
+
+
+max1= maximum(test_data_sezonsayısı)
+max2 = maximum(predicted_Values)
+
+max=max1
+if max2>max1
+    max=max2
+end
+
+
+
+using MLBase
+using Plots
+cm = confusmat(max,test_data_sezonsayısı,predicted_Values)
+heatmap(cm, xlabel="Tahmin Edilen", ylabel="Gerçek Değer", title="Confusion Matrix")
 
 
 

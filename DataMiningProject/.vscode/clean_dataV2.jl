@@ -47,4 +47,4 @@ function clean_data_and_write(input_file::AbstractString, output_file::AbstractS
     XLSX.writetable(output_file, DataFrame(subset_data))
 end
 
-clean_data_and_write("output.xlsx", "cleaning_data.xlsx")
+clean_data_and_write("output3.xlsx", "cleaning_data2.xlsx")
